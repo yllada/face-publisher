@@ -98,9 +98,17 @@ async function nextPackage() {
   render();
 }
 
+// Web Share API on Android Chrome has practical issues with more than ~10
+// files at once. We cap the package at 10 files total, prioritizing defaults.
+const SHARE_FILE_CAP = 10;
+
 function buildFiles(pkg) {
-  const items = [...pkg.defaults, ...pkg.reals];
-  return items.map((it, i) => {
+  const stamped = [
+    ...pkg.defaults.map((d) => ({ ...d, _kind: 'default' })),
+    ...pkg.reals.map((r) => ({ ...r, _kind: 'real' })),
+  ];
+  const limited = stamped.slice(0, SHARE_FILE_CAP);
+  return limited.map((it, i) => {
     const type = it.blob.type || 'image/jpeg';
     const ext = type === 'image/jpeg' ? 'jpg' : (type.split('/')[1] || 'jpg');
     const stem = (it.name || `img_${i}`).replace(/\.[a-z0-9]+$/i, '') || `img_${i}`;
@@ -109,10 +117,13 @@ function buildFiles(pkg) {
   });
 }
 
-async function tryShare(files) {
-  if (!navigator.canShare || !navigator.canShare({ files })) return false;
-  await navigator.share({ files });
-  return true;
+function reportError(stage, err) {
+  console.error(`[share:${stage}]`, err);
+  const name = (err && err.name) || 'Error';
+  const msg = (err && err.message) || '';
+  const text = `${stage} → ${name}${msg ? ': ' + msg.slice(0, 80) : ''}`;
+  elStatus.textContent = text;
+  showToast(text, 5000);
 }
 
 async function sharePackage() {
@@ -123,21 +134,36 @@ async function sharePackage() {
     return;
   }
   if (typeof navigator.share !== 'function') {
-    showToast('Compartir no soportado en este navegador');
+    reportError('no-api', new Error('navigator.share no existe'));
     return;
   }
 
   const files = buildFiles(pkg);
+  const truncated = pkg.defaults.length + pkg.reals.length > SHARE_FILE_CAP;
+
+  // Verify the data is shareable BEFORE calling share, per Web Share spec.
+  if (typeof navigator.canShare !== 'function') {
+    reportError('no-canShare', new Error('canShare no soportado'));
+    return;
+  }
+  if (!navigator.canShare({ files })) {
+    reportError('canShare-false', new Error(`canShare rechazó ${files.length} archivos`));
+    return;
+  }
+
+  elStatus.textContent = `Compartiendo ${files.length} archivo${files.length === 1 ? '' : 's'}…`;
 
   try {
-    if (await tryShare(files)) return;
-    showToast('Este dispositivo no acepta los archivos');
+    await navigator.share({ files });
+    elStatus.textContent = truncated
+      ? `Compartido (truncado a ${SHARE_FILE_CAP} de ${pkg.defaults.length + pkg.reals.length})`
+      : 'Compartido';
   } catch (e) {
-    if (e && e.name === 'AbortError') return;
-    console.error('share failed', e);
-    const name = (e && e.name) || 'Error';
-    const msg = (e && e.message) || '';
-    showToast(`${name}${msg ? ': ' + msg.slice(0, 60) : ''}`, 4000);
+    if (e && e.name === 'AbortError') {
+      elStatus.textContent = 'Cancelado';
+      return;
+    }
+    reportError('share', e);
   }
 }
 
