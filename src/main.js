@@ -1,9 +1,11 @@
 import { initImagesTab } from './ui/images-tab.js';
 import { initPublishTab } from './ui/publish-tab.js';
+import { initPackagesTab } from './ui/packages-tab.js';
 
 const tabs = document.querySelectorAll('.tab');
 const panels = {
   publish: document.getElementById('publish-panel'),
+  packages: document.getElementById('packages-panel'),
   images: document.getElementById('images-panel'),
 };
 
@@ -23,6 +25,7 @@ tabs.forEach((tab) => {
 });
 
 initImagesTab();
+initPackagesTab();
 initPublishTab();
 
 if ('serviceWorker' in navigator) {

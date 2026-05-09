@@ -1,18 +1,15 @@
 import {
-  add, getAll, clearStore, setState, STORES,
+  add, getAll, clearStore, deleteRecord, setState, STORES,
 } from '../core/db.js';
 
 async function resetCurrentIndex() {
   await setState('currentIndex', 0);
 }
 import { resizeImage } from '../core/resize.js';
-import {
-  rebuildPackagesStore,
-  getHydratedPackages,
-  removeImageFromPackage,
-} from '../core/packages.js';
-import { emit } from '../core/store.js';
+import { rebuildPackagesStore } from '../core/packages.js';
+import { subscribe, emit } from '../core/store.js';
 import { showToast } from './toast.js';
+import { confirmDialog } from './confirm.js';
 
 const inputDefaults = document.getElementById('upload-defaults');
 const inputImages = document.getElementById('upload-images');
@@ -20,7 +17,6 @@ const btnResetDefaults = document.getElementById('reset-defaults');
 const btnResetImages = document.getElementById('reset-images');
 const gridDefaults = document.getElementById('defaults-grid');
 const gridImages = document.getElementById('images-grid');
-const pkgList = document.getElementById('packages-list');
 
 const blobUrls = new Set();
 function makeUrl(blob) {
@@ -31,6 +27,19 @@ function makeUrl(blob) {
 function revokeAll() {
   for (const u of blobUrls) URL.revokeObjectURL(u);
   blobUrls.clear();
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgUse(id, size) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', `#${id}`);
+  svg.appendChild(use);
+  return svg;
 }
 
 async function ingestFiles(files, store) {
@@ -75,7 +84,14 @@ inputImages.addEventListener('change', async (e) => {
 });
 
 btnResetDefaults.addEventListener('click', async () => {
-  if (!confirm('¿Eliminar todas las imágenes por defecto?')) return;
+  const ok = await confirmDialog({
+    title: 'Eliminar imágenes por defecto',
+    message: 'Se borrarán todas las imágenes por defecto y se reconstruirán los paquetes. Esta acción no se puede deshacer.',
+    confirmText: 'Eliminar todo',
+    cancelText: 'Cancelar',
+    destructive: true,
+  });
+  if (!ok) return;
   await clearStore(STORES.DEFAULTS);
   await rebuildPackagesStore();
   await resetCurrentIndex();
@@ -85,7 +101,14 @@ btnResetDefaults.addEventListener('click', async () => {
 });
 
 btnResetImages.addEventListener('click', async () => {
-  if (!confirm('¿Eliminar todas las imágenes?')) return;
+  const ok = await confirmDialog({
+    title: 'Eliminar imágenes',
+    message: 'Se borrarán todas las imágenes numeradas y se reconstruirán los paquetes. Esta acción no se puede deshacer.',
+    confirmText: 'Eliminar todo',
+    cancelText: 'Cancelar',
+    destructive: true,
+  });
+  if (!ok) return;
   await clearStore(STORES.IMAGES);
   await rebuildPackagesStore();
   await resetCurrentIndex();
@@ -94,7 +117,7 @@ btnResetImages.addEventListener('click', async () => {
   emit();
 });
 
-function renderGrid(grid, items) {
+function renderGrid(grid, items, store) {
   grid.innerHTML = '';
   if (!items.length) {
     const empty = document.createElement('p');
@@ -110,82 +133,54 @@ function renderGrid(grid, items) {
     const img = document.createElement('img');
     img.src = makeUrl(it.blob);
     img.alt = it.name;
+    img.loading = 'lazy';
+    img.decoding = 'async';
     div.appendChild(img);
+
     const name = document.createElement('div');
     name.className = 'name';
     name.textContent = it.name;
     div.appendChild(name);
+
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.type = 'button';
+    del.setAttribute('aria-label', `Eliminar ${it.name}`);
+    del.appendChild(svgUse('i-x', 16));
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const ok = await confirmDialog({
+        title: 'Eliminar imagen',
+        message: `¿Eliminar "${it.name}"? Se reconstruirán los paquetes.`,
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar',
+        destructive: true,
+      });
+      if (!ok) return;
+      await deleteRecord(store, it.id);
+      await rebuildPackagesStore();
+      await resetCurrentIndex();
+      showToast('Imagen eliminada');
+      await refresh();
+      emit();
+    });
+    div.appendChild(del);
+
     grid.appendChild(div);
   }
 }
 
-function renderPackages(packages) {
-  pkgList.innerHTML = '';
-  if (!packages.length) {
-    const empty = document.createElement('p');
-    empty.className = 'hint';
-    empty.textContent = 'Sin paquetes. Necesitás defaults + imágenes con número.';
-    pkgList.appendChild(empty);
-    return;
-  }
-  packages.forEach((pkg, idx) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'pkg';
-    wrap.dataset.id = pkg.id;
-
-    const head = document.createElement('div');
-    head.className = 'pkg-head';
-    head.innerHTML = `
-      <strong>#${idx + 1} · ${pkg.label}</strong>
-      <span class="badge">${pkg.defaults.length} default · ${pkg.reals.length} reales</span>
-    `;
-    wrap.appendChild(head);
-
-    const grid = document.createElement('div');
-    grid.className = 'pkg-grid';
-
-    const items = [
-      ...pkg.defaults.map((d) => ({ ...d, _kind: 'default' })),
-      ...pkg.reals.map((r) => ({ ...r, _kind: 'real' })),
-    ];
-
-    items.forEach((it) => {
-      const ph = document.createElement('div');
-      ph.className = 'ph' + (it._kind === 'default' ? ' is-default' : '');
-      const img = document.createElement('img');
-      img.src = makeUrl(it.blob);
-      ph.appendChild(img);
-      const x = document.createElement('div');
-      x.className = 'x';
-      x.textContent = '×';
-      ph.appendChild(x);
-
-      ph.addEventListener('click', async () => {
-        if (!confirm(`¿Quitar "${it.name}" de este paquete?`)) return;
-        await removeImageFromPackage(pkg.id, it.id, it._kind);
-        await refresh();
-        emit();
-      });
-      grid.appendChild(ph);
-    });
-
-    wrap.appendChild(grid);
-    pkgList.appendChild(wrap);
-  });
-}
-
 export async function refresh() {
   revokeAll();
-  const [defaults, images, packages] = await Promise.all([
+  const [defaults, images] = await Promise.all([
     getAll(STORES.DEFAULTS),
     getAll(STORES.IMAGES),
-    getHydratedPackages(),
   ]);
-  renderGrid(gridDefaults, defaults);
-  renderGrid(gridImages, images);
-  renderPackages(packages);
+  renderGrid(gridDefaults, defaults, STORES.DEFAULTS);
+  renderGrid(gridImages, images, STORES.IMAGES);
 }
 
 export function initImagesTab() {
+  subscribe(refresh);
   refresh();
 }
