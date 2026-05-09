@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon.svg" />
+    <title>Face Publisher</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Face Publisher</h1>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="publish" role="tab" aria-selected="true">Publicar</button>
+      <button class="tab" data-tab="images" role="tab" aria-selected="false">Imágenes</button>
+    </nav>
+
+    <main id="publish-panel" class="panel is-active" role="tabpanel">
+      <section class="counter">
+        <div class="counter-label">Paquete</div>
+        <div class="counter-value">
+          <span id="pkg-current">—</span>
+          <span class="counter-sep">/</span>
+          <span id="pkg-total">—</span>
+        </div>
+        <div class="counter-status" id="pkg-status">Sin paquetes</div>
+      </section>
+
+      <section class="preview" id="preview"></section>
+
+      <div class="action-bar">
+        <button id="btn-share" class="action-btn primary" disabled>Compartir</button>
+        <button id="btn-next" class="action-btn" disabled>Siguiente</button>
+      </div>
+    </main>
+
+    <main id="images-panel" class="panel" role="tabpanel">
+      <section class="upload-block">
+        <h2>Imágenes por defecto</h2>
+        <p class="hint">Encabezados — se incluyen al inicio de cada paquete.</p>
+        <div class="row">
+          <label class="btn">
+            Subir defaults
+            <input type="file" id="upload-defaults" accept="image/*" multiple hidden />
+          </label>
+          <button id="reset-defaults" class="btn danger">Resetear</button>
+        </div>
+        <div id="defaults-grid" class="grid"></div>
+      </section>
+
+      <section class="upload-block">
+        <h2>Imágenes</h2>
+        <p class="hint">Numeradas (01.jpg, 02.jpg…). Se agrupan: 00–09, 10–19, 20–29…</p>
+        <div class="row">
+          <label class="btn">
+            Subir imágenes
+            <input type="file" id="upload-images" accept="image/*" multiple hidden />
+          </label>
+          <button id="reset-images" class="btn danger">Resetear</button>
+        </div>
+        <div id="images-grid" class="grid"></div>
+      </section>
+
+      <section class="upload-block">
+        <h2>Paquetes generados</h2>
+        <p class="hint">Vista previa. Tocá una imagen para eliminarla del paquete.</p>
+        <div id="packages-list"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
