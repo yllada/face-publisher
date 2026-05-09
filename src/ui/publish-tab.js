@@ -98,6 +98,23 @@ async function nextPackage() {
   render();
 }
 
+function buildFiles(pkg) {
+  const items = [...pkg.defaults, ...pkg.reals];
+  return items.map((it, i) => {
+    const type = it.blob.type || 'image/jpeg';
+    const ext = type === 'image/jpeg' ? 'jpg' : (type.split('/')[1] || 'jpg');
+    const stem = (it.name || `img_${i}`).replace(/\.[a-z0-9]+$/i, '') || `img_${i}`;
+    const baseName = `${stem}.${ext}`;
+    return new File([it.blob], baseName, { type });
+  });
+}
+
+async function tryShare(files) {
+  if (!navigator.canShare || !navigator.canShare({ files })) return false;
+  await navigator.share({ files });
+  return true;
+}
+
 async function sharePackage() {
   const pkg = packages[currentIndex];
   if (!pkg) return;
@@ -105,36 +122,22 @@ async function sharePackage() {
     showToast('Paquete incompleto');
     return;
   }
-  if (typeof navigator.canShare !== 'function') {
+  if (typeof navigator.share !== 'function') {
     showToast('Compartir no soportado en este navegador');
     return;
   }
 
-  const items = [...pkg.defaults, ...pkg.reals];
-  const files = items.map((it, i) => {
-    const ext = (it.blob.type || 'image/jpeg').split('/')[1] || 'jpg';
-    const baseName = it.name && /\.[a-z0-9]+$/i.test(it.name)
-      ? it.name
-      : `${(it.name || 'img_' + i)}.${ext}`;
-    return new File([it.blob], baseName, { type: it.blob.type || 'image/jpeg' });
-  });
-
-  if (!navigator.canShare({ files })) {
-    showToast('Compartir archivos no soportado en este dispositivo');
-    return;
-  }
+  const files = buildFiles(pkg);
 
   try {
-    await navigator.share({
-      files,
-      title: `Paquete ${pkg.label}`,
-      text: `Paquete ${currentIndex + 1}/${packages.length} · ${pkg.label}`,
-    });
+    if (await tryShare(files)) return;
+    showToast('Este dispositivo no acepta los archivos');
   } catch (e) {
-    if (e && e.name !== 'AbortError') {
-      console.error(e);
-      showToast('Error al compartir');
-    }
+    if (e && e.name === 'AbortError') return;
+    console.error('share failed', e);
+    const name = (e && e.name) || 'Error';
+    const msg = (e && e.message) || '';
+    showToast(`${name}${msg ? ': ' + msg.slice(0, 60) : ''}`, 4000);
   }
 }
 

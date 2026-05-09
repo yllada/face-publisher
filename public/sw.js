@@ -1,4 +1,4 @@
-const CACHE = 'face-publisher-v1';
+const CACHE = 'face-publisher-v2';
 const APP_SHELL = [
   './',
   './index.html',
