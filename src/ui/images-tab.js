@@ -18,6 +18,55 @@ const btnResetImages = document.getElementById('reset-images');
 const gridDefaults = document.getElementById('defaults-grid');
 const gridImages = document.getElementById('images-grid');
 
+const labelDefaults = inputDefaults.closest('label');
+const labelImages = inputImages.closest('label');
+
+const elProgress = document.getElementById('upload-progress');
+const elProgTitle = document.getElementById('upload-progress-title');
+const elProgFill = document.getElementById('upload-progress-fill');
+const elProgTrack = document.getElementById('upload-progress-track');
+const elProgCount = document.getElementById('upload-progress-count');
+const elProgCurrent = document.getElementById('upload-progress-current');
+const btnUploadCancel = document.getElementById('upload-cancel');
+
+let cancelRequested = false;
+btnUploadCancel.addEventListener('click', () => {
+  cancelRequested = true;
+  btnUploadCancel.disabled = true;
+  btnUploadCancel.textContent = 'Cancelando…';
+});
+
+function setUploadDisabled(disabled) {
+  for (const lbl of [labelDefaults, labelImages]) {
+    if (lbl) lbl.setAttribute('aria-disabled', String(disabled));
+  }
+  btnResetDefaults.disabled = disabled;
+  btnResetImages.disabled = disabled;
+}
+
+function showProgress(kind, total) {
+  elProgTitle.textContent = kind === 'defaults' ? 'Procesando defaults' : 'Procesando imágenes';
+  elProgCount.textContent = `0 / ${total}`;
+  elProgCurrent.textContent = '';
+  elProgFill.style.width = '0%';
+  elProgTrack.setAttribute('aria-valuenow', '0');
+  btnUploadCancel.disabled = false;
+  btnUploadCancel.textContent = 'Cancelar';
+  elProgress.hidden = false;
+}
+
+function updateProgress(done, total, currentName) {
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  elProgCount.textContent = `${done} / ${total}`;
+  elProgCurrent.textContent = currentName || '';
+  elProgFill.style.width = `${pct}%`;
+  elProgTrack.setAttribute('aria-valuenow', String(pct));
+}
+
+function hideProgress() {
+  elProgress.hidden = true;
+}
+
 const blobUrls = new Set();
 function makeUrl(blob) {
   const u = URL.createObjectURL(blob);
@@ -42,11 +91,20 @@ function svgUse(id, size) {
   return svg;
 }
 
-async function ingestFiles(files, store) {
-  if (!files || !files.length) return 0;
-  showToast(`Procesando ${files.length}…`);
+async function ingestFiles(files, store, kind) {
+  if (!files || !files.length) return { added: 0, cancelled: false, failed: 0 };
+
+  cancelRequested = false;
+  setUploadDisabled(true);
+  showProgress(kind, files.length);
+
   let added = 0;
+  let failed = 0;
+  let i = 0;
+
   for (const file of files) {
+    if (cancelRequested) break;
+    updateProgress(i, files.length, file.name);
     try {
       const blob = await resizeImage(file);
       await add(store, {
@@ -57,28 +115,45 @@ async function ingestFiles(files, store) {
       });
       added++;
     } catch (e) {
+      failed++;
       console.error('resize failed', file.name, e);
     }
+    i++;
+    updateProgress(i, files.length, file.name);
   }
-  return added;
+
+  hideProgress();
+  setUploadDisabled(false);
+  return { added, cancelled: cancelRequested, failed };
+}
+
+function summaryToast(kind, { added, cancelled, failed }) {
+  const noun = kind === 'defaults'
+    ? (added === 1 ? 'default' : 'defaults')
+    : (added === 1 ? 'imagen' : 'imágenes');
+  const verb = added === 1 ? 'agregada' : 'agregadas';
+  let msg = `${added} ${noun} ${verb}`;
+  if (failed > 0) msg += ` · ${failed} con error`;
+  if (cancelled) msg = `Cancelado · ${msg}`;
+  showToast(msg, cancelled || failed ? 3000 : 1800);
 }
 
 inputDefaults.addEventListener('change', async (e) => {
-  const n = await ingestFiles(e.target.files, STORES.DEFAULTS);
+  const result = await ingestFiles(e.target.files, STORES.DEFAULTS, 'defaults');
   inputDefaults.value = '';
   await rebuildPackagesStore();
   await resetCurrentIndex();
-  showToast(`${n} default${n === 1 ? '' : 's'} agregada${n === 1 ? '' : 's'}`);
+  summaryToast('defaults', result);
   await refresh();
   emit();
 });
 
 inputImages.addEventListener('change', async (e) => {
-  const n = await ingestFiles(e.target.files, STORES.IMAGES);
+  const result = await ingestFiles(e.target.files, STORES.IMAGES, 'images');
   inputImages.value = '';
   await rebuildPackagesStore();
   await resetCurrentIndex();
-  showToast(`${n} imagen${n === 1 ? '' : 'es'} agregada${n === 1 ? '' : 's'}`);
+  summaryToast('images', result);
   await refresh();
   emit();
 });

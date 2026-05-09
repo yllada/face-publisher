@@ -558,6 +558,91 @@ button, .btn { font-family: inherit; }
   .dialog { transform: none; }
 }
 
+/* ------- Upload progress ------- */
+.upload-progress {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--action-h) + var(--safe-bottom) + 12px);
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 12px 14px;
+  z-index: 20;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.upload-progress[hidden] { display: none; }
+.upload-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+.upload-progress-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.upload-progress-cancel {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-right: -6px;
+  min-height: 32px;
+  -webkit-tap-highlight-color: transparent;
+}
+.upload-progress-cancel:active {
+  background: rgba(255, 91, 109, 0.15);
+}
+.upload-progress-bar {
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.upload-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  transition: width 180ms ease-out;
+  border-radius: 3px;
+}
+.upload-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted-strong);
+  font-variant-numeric: tabular-nums;
+  gap: 12px;
+}
+.upload-progress-current {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: right;
+  min-width: 0;
+}
+
+.btn[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-progress-fill { transition: none; }
+}
+
 /* ------- Toast ------- */
 .toast {
   position: fixed;

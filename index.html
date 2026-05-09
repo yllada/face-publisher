@@ -122,6 +122,20 @@
       </section>
     </main>
 
+    <div id="upload-progress" class="upload-progress" role="status" aria-live="polite" hidden>
+      <div class="upload-progress-head">
+        <span class="upload-progress-title" id="upload-progress-title">Procesando imágenes</span>
+        <button id="upload-cancel" class="upload-progress-cancel" type="button">Cancelar</button>
+      </div>
+      <div class="upload-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="upload-progress-track">
+        <div class="upload-progress-fill" id="upload-progress-fill"></div>
+      </div>
+      <div class="upload-progress-meta">
+        <span id="upload-progress-count">0 / 0</span>
+        <span class="upload-progress-current" id="upload-progress-current"></span>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script type="module" src="./src/main.js"></script>
